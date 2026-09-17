@@ -18,5 +18,5 @@ jobs:
           php -l scripts/migrate-content-v4.php
           php -l scripts/seed-existing-content-v3.php
           php -l scripts/verify-cms-v4.php
-          bash -n scripts/upgrade-admin-v5.sh
+          bash -n scripts/upgrade-admin-v6.sh
           bash -n scripts/deploy-admin.sh
