@@ -20,8 +20,13 @@ fail() {
   exit 1
 }
 
+last_detail() {
+  local file="$1"
+  grep -v '^[[:space:]]*$' "$file" 2>/dev/null | tail -n 1 | tr '\r\n' ' ' | cut -c1-180 || true
+}
+
 set_state "starting:v6"
-for f in deploy-admin.sh migrate-content-v4.php seed-existing-content-v3.php verify-cms-v4.php; do
+for f in deploy-admin.sh migrate-content-v4.php seed-existing-content-v3.php seed-platforms-v6.php verify-cms-v4.php; do
   curl -fsSL --retry 4 --retry-delay 2 "$BASE/$f" -o "$TMP/$f" || fail "download:$f"
 done
 curl -fsSL --retry 4 --retry-delay 2 "$PROJECTS_URL" -o "$TMP/projects.ts" || fail "download:projects.ts"
@@ -52,19 +57,31 @@ done
 set_state "php-runtime:$("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo unknown)"
 
 if ! "$PHP_BIN" "$TMP/migrate-content-v4.php" >"$TMP/migrate.log" 2>&1; then
-  detail="$(tail -n 1 "$TMP/migrate.log" | tr '\r\n' ' ' | cut -c1-180)"
+  detail="$(last_detail "$TMP/migrate.log")"
   fail "migration:${detail:-unknown}"
 fi
 set_state "migrated:v6"
 
-if ! PROJECTS_TS_PATH="$TMP/projects.ts" "$PHP_BIN" "$TMP/seed-existing-content-v3.php" >"$TMP/seed.log" 2>&1; then
-  detail="$(tail -n 1 "$TMP/seed.log" | tr '\r\n' ' ' | cut -c1-180)"
-  fail "seed:${detail:-unknown}"
+# The legacy combined seeder reliably populates the 30 project rows. Older versions
+# then stopped when MySQL treated the platform column name `lead` as a reserved word.
+# Run it for project import, tolerate that known platform-stage failure, then use the
+# dedicated quoted platform seeder below. Final verification remains authoritative.
+set +e
+PROJECTS_TS_PATH="$TMP/projects.ts" "$PHP_BIN" "$TMP/seed-existing-content-v3.php" >"$TMP/projects-seed.log" 2>&1
+PROJECT_SEED_RC=$?
+set -e
+if [ "$PROJECT_SEED_RC" -ne 0 ]; then
+  set_state "projects-seeded-platform-fallback:v6"
+fi
+
+if ! "$PHP_BIN" "$TMP/seed-platforms-v6.php" >"$TMP/platform-seed.log" 2>&1; then
+  detail="$(last_detail "$TMP/platform-seed.log")"
+  fail "platform-seed:${detail:-unknown}"
 fi
 set_state "seeded:v6"
 
 if ! "$PHP_BIN" "$TMP/verify-cms-v4.php" >"$TMP/verify.log" 2>&1; then
-  detail="$(tail -n 1 "$TMP/verify.log" | tr '\r\n' ' ' | cut -c1-180)"
+  detail="$(last_detail "$TMP/verify.log")"
   fail "verify:${detail:-unknown}"
 fi
 set_state "verified:v6"
