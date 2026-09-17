@@ -1,0 +1,115 @@
+name: Deploy to cPanel
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_deploy:
+        description: "Type DEPLOY to confirm deployment to the configured cPanel path"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    if: ${{ github.event.inputs.confirm_live_deploy == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build static website
+        run: npm run build
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d out
+          test -f out/index.html
+          test -f out/logo.png
+          test -f out/projects/exquisite-management/project.pdf
+          echo "Static export verified."
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.CPANEL_HOST }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/cpanel_deploy_key
+          chmod 600 ~/.ssh/cpanel_deploy_key
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify SSH and rsync
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "set -e; command -v rsync >/dev/null; mkdir -p '$DEPLOY_PATH'; test -d '$DEPLOY_PATH'; echo 'SSH and rsync verified.'"
+
+      - name: Back up current live files
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "set -e; mkdir -p \"$HOME/deploy-backups\"; if [ -n \"\$(find '$DEPLOY_PATH' -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)\" ]; then stamp=\$(date +%Y%m%d-%H%M%S); tar -czf \"$HOME/deploy-backups/public_html-before-nextjs-$stamp.tar.gz\" -C '$DEPLOY_PATH' .; echo \"Backup created: $HOME/deploy-backups/public_html-before-nextjs-$stamp.tar.gz\"; else echo 'Deploy path is empty; no backup needed.'; fi"
+
+      - name: Deploy static website
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude='.well-known/' \
+            -e "ssh -i ~/.ssh/cpanel_deploy_key -p $SSH_PORT" \
+            out/ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/"
+
+      - name: Verify deployed homepage
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "test -f '$DEPLOY_PATH/index.html' && test -f '$DEPLOY_PATH/logo.png' && echo 'Deployment files verified on cPanel.'"
