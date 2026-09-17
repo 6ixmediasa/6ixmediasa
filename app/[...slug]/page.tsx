@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PageTemplate from "@/components/PageTemplate";
 import { pages, getPage } from "@/lib/pages";
+import { platforms } from "@/lib/content";
 
 type Props = { params: Promise<{ slug: string[] }> };
 
 export function generateStaticParams() {
-  return pages.map((p) => ({ slug: p.slug.split("/") }));
+  const cmsPlatformSlugs = new Set(platforms.map((p) => `platforms/${p.slug}`));
+  return pages.filter((p) => !cmsPlatformSlugs.has(p.slug)).map((p) => ({ slug: p.slug.split("/") }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -18,18 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: page.metaTitle,
     description: page.metaDescription,
     alternates: { canonical: url },
-    openGraph: {
-      title: page.metaTitle,
-      description: page.metaDescription,
-      url,
-      type: "website",
-      locale: "en_ZA",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: page.metaTitle,
-      description: page.metaDescription,
-    },
+    openGraph: { title: page.metaTitle, description: page.metaDescription, url, type: "website", locale: "en_ZA" },
+    twitter: { card: "summary_large_image", title: page.metaTitle, description: page.metaDescription },
   };
 }
 
@@ -46,58 +38,10 @@ export default async function CatchAllPage({ params }: Props) {
   ];
 
   const graph: Record<string, unknown>[] = [
-    {
-      "@type": "BreadcrumbList",
-      itemListElement: crumbs.map((c, i) => ({
-        "@type": "ListItem",
-        position: i + 1,
-        name: c.name,
-        item: c.item,
-      })),
-    },
-    {
-      "@type": "Service",
-      name: page.h1,
-      description: page.metaDescription,
-      serviceType: page.eyebrow,
-      provider: { "@id": "https://6ixmediasa.com/#org" },
-      areaServed: [
-        { "@type": "Country", name: "South Africa" },
-        { "@type": "Country", name: "China" },
-      ],
-      ...(page.price
-        ? {
-            offers: {
-              "@type": "Offer",
-              priceCurrency: "ZAR",
-              price: page.price.replace(/[^0-9]/g, "") || undefined,
-              description: page.price,
-            },
-          }
-        : {}),
-    },
+    { "@type": "BreadcrumbList", itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.item })) },
+    { "@type": "Service", name: page.h1, description: page.metaDescription, serviceType: page.eyebrow, provider: { "@id": "https://6ixmediasa.com/#org" }, areaServed: [{ "@type": "Country", name: "South Africa" }, { "@type": "Country", name: "China" }], ...(page.price ? { offers: { "@type": "Offer", priceCurrency: "ZAR", price: page.price.replace(/[^0-9]/g, "") || undefined, description: page.price } } : {}) },
   ];
+  if (page.faqs?.length) graph.push({ "@type": "FAQPage", mainEntity: page.faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) });
 
-  if (page.faqs?.length) {
-    graph.push({
-      "@type": "FAQPage",
-      mainEntity: page.faqs.map((f) => ({
-        "@type": "Question",
-        name: f.q,
-        acceptedAnswer: { "@type": "Answer", text: f.a },
-      })),
-    });
-  }
-
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({ "@context": "https://schema.org", "@graph": graph }),
-        }}
-      />
-      <PageTemplate page={page} />
-    </>
-  );
+  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@graph": graph }) }} /><PageTemplate page={page} /></>;
 }
