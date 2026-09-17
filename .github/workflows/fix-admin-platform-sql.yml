@@ -1,0 +1,40 @@
+name: Fix admin platform SQL
+
+on:
+  push:
+    branches: [admin-cms]
+    paths:
+      - '.github/workflows/fix-admin-platform-sql.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: admin-cms
+      - name: Quote platform SQL identifiers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/index.php')
+          s=p.read_text()
+          old1="UPDATE platforms SET slug=?,name=?,what_label=?,h1=?,lead=?,meta_title=?,meta_description=?,price=?,price_note=?,features_json=?,audience=?,deliverables_json=?,faqs_json=?,docs_json=?,status=?,updated_at=NOW() WHERE id=?"
+          new1="UPDATE `platforms` SET `slug`=?,`name`=?,`what_label`=?,`h1`=?,`lead`=?,`meta_title`=?,`meta_description`=?,`price`=?,`price_note`=?,`features_json`=?,`audience`=?,`deliverables_json`=?,`faqs_json`=?,`docs_json`=?,`status`=?,`updated_at`=NOW() WHERE `id`=?"
+          old2="INSERT INTO platforms (slug,name,what_label,h1,lead,meta_title,meta_description,price,price_note,features_json,audience,deliverables_json,faqs_json,docs_json,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+          new2="INSERT INTO `platforms` (`slug`,`name`,`what_label`,`h1`,`lead`,`meta_title`,`meta_description`,`price`,`price_note`,`features_json`,`audience`,`deliverables_json`,`faqs_json`,`docs_json`,`status`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+          if old1 not in s or old2 not in s:
+              raise SystemExit('Expected platform SQL strings not found')
+          s=s.replace(old1,new1).replace(old2,new2)
+          p.write_text(s)
+          PY
+          php -l public/index.php
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/index.php
+          git commit -m 'Quote platform SQL identifiers in admin editor'
+          git push origin HEAD:admin-cms
