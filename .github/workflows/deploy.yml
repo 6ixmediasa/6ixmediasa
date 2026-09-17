@@ -53,6 +53,7 @@ jobs:
         shell: bash
         env:
           SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          SSH_KEY_PASSPHRASE: ${{ secrets.CPANEL_SSH_KEY_PASSPHRASE }}
           SSH_HOST: ${{ secrets.CPANEL_HOST }}
           SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
         run: |
@@ -61,6 +62,9 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/cpanel_deploy_key
           chmod 600 ~/.ssh/cpanel_deploy_key
+          if [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
+            ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f ~/.ssh/cpanel_deploy_key >/dev/null
+          fi
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
