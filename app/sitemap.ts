@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { pages } from "@/lib/pages";
 import { projects } from "@/lib/projects";
 
+export const dynamic = "force-static";
+
 const BASE = "https://6ixmediasa.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
