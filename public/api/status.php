@@ -5,7 +5,9 @@ header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 $home=getenv('HOME')?:'/home/ixmedia1';
 $configFile=$home.'/.6ixmedia-admin/config.php';
-if(!is_file($configFile)){http_response_code(503);echo json_encode(['ok'=>false,'stage'=>'config_missing']);exit;}
+$stateFile=$home.'/.6ixmedia-admin/rollout-state.txt';
+$rolloutState=is_file($stateFile)?trim((string)file_get_contents($stateFile)):null;
+if(!is_file($configFile)){http_response_code(503);echo json_encode(['ok'=>false,'stage'=>'config_missing','rollout_state'=>$rolloutState]);exit;}
 try{
   $c=require $configFile;
   $pdo=new PDO(sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4',$c['db_host'],$c['db_name']),$c['db_user'],$c['db_pass'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
@@ -18,5 +20,5 @@ try{
   $published=['projects'=>$tables['projects']?(int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status='published'")->fetchColumn():null,'platforms'=>$tables['platforms']?(int)$pdo->query("SELECT COUNT(*) FROM platforms WHERE status='published'")->fetchColumn():null,'posts'=>$tables['posts']?(int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='published'")->fetchColumn():null];
   $versionFile=$home.'/.6ixmedia-admin-version';$version=is_file($versionFile)?trim((string)file_get_contents($versionFile)):null;
   $ok=!in_array(false,$tables,true)&&count($missing)===0&&($counts['projects']??0)>=30&&($counts['platforms']??0)>=8;
-  echo json_encode(['ok'=>$ok,'admin_version'=>$version,'tables'=>$tables,'missing_project_columns'=>$missing,'counts'=>$counts,'published'=>$published],JSON_UNESCAPED_SLASHES);
-}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'stage'=>'database_or_schema_error','error_class'=>get_class($e)]);}
+  echo json_encode(['ok'=>$ok,'admin_version'=>$version,'rollout_state'=>$rolloutState,'web_php'=>PHP_VERSION,'pdo_mysql'=>extension_loaded('pdo_mysql'),'tables'=>$tables,'missing_project_columns'=>$missing,'counts'=>$counts,'published'=>$published],JSON_UNESCAPED_SLASHES);
+}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'stage'=>'database_or_schema_error','error_class'=>get_class($e),'rollout_state'=>$rolloutState,'web_php'=>PHP_VERSION,'pdo_mysql'=>extension_loaded('pdo_mysql')]);}
