@@ -3,3 +3,4 @@ Retry after SSH key normalization fix.
 Retry with PuTTY/PEM compatibility.
 Retry with replacement OpenSSH key from cPanel terminal.
 Deploy using base64-encoded OpenSSH key.
+Retry after base64 whitespace normalization.
