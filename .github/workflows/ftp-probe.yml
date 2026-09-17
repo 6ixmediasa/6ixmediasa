@@ -1,0 +1,28 @@
+name: Probe cPanel FTPS account
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/ftp-probe-now.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Verify FTPS login and account scope
+        shell: bash
+        env:
+          FTP_PASSWORD: ${{ secrets.CPANEL_FTP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          HOST="ftp.6ixmediasa.com"
+          USER="chatgpt@6ixmediasa.com"
+          lftp -u "$USER","$FTP_PASSWORD" -p 21 "$HOST" -e "set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate yes; echo PWD_START; pwd; echo LIST_START; cls -la; echo WRITE_TEST; mkdir .chatgpt-deploy-probe; rmdir .chatgpt-deploy-probe; echo PROBE_OK; bye"
