@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BASE="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/admin-cms/scripts"
+PROJECTS_URL="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/main/lib/projects.ts"
 HOME_DIR="${HOME:-/home/ixmedia1}"
 STATE_DIR="$HOME_DIR/.6ixmedia-admin"
 STATE_FILE="$STATE_DIR/rollout-state.txt"
@@ -23,6 +24,8 @@ set_state "starting:v6"
 for f in deploy-admin.sh migrate-content-v4.php seed-existing-content-v3.php verify-cms-v4.php; do
   curl -fsSL --retry 4 --retry-delay 2 "$BASE/$f" -o "$TMP/$f" || fail "download:$f"
 done
+curl -fsSL --retry 4 --retry-delay 2 "$PROJECTS_URL" -o "$TMP/projects.ts" || fail "download:projects.ts"
+[ -s "$TMP/projects.ts" ] || fail "projects-source:empty"
 
 bash "$TMP/deploy-admin.sh" || fail "deploy-admin"
 set_state "deployed:v6"
@@ -48,11 +51,22 @@ done
 [ -n "$PHP_BIN" ] || fail "php-runtime:no-pdo-mysql"
 set_state "php-runtime:$("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo unknown)"
 
-"$PHP_BIN" "$TMP/migrate-content-v4.php" || fail "migration"
+if ! "$PHP_BIN" "$TMP/migrate-content-v4.php" >"$TMP/migrate.log" 2>&1; then
+  detail="$(tail -n 1 "$TMP/migrate.log" | tr '\r\n' ' ' | cut -c1-180)"
+  fail "migration:${detail:-unknown}"
+fi
 set_state "migrated:v6"
-"$PHP_BIN" "$TMP/seed-existing-content-v3.php" || fail "seed"
+
+if ! PROJECTS_TS_PATH="$TMP/projects.ts" "$PHP_BIN" "$TMP/seed-existing-content-v3.php" >"$TMP/seed.log" 2>&1; then
+  detail="$(tail -n 1 "$TMP/seed.log" | tr '\r\n' ' ' | cut -c1-180)"
+  fail "seed:${detail:-unknown}"
+fi
 set_state "seeded:v6"
-"$PHP_BIN" "$TMP/verify-cms-v4.php" || fail "verify"
+
+if ! "$PHP_BIN" "$TMP/verify-cms-v4.php" >"$TMP/verify.log" 2>&1; then
+  detail="$(tail -n 1 "$TMP/verify.log" | tr '\r\n' ' ' | cut -c1-180)"
+  fail "verify:${detail:-unknown}"
+fi
 set_state "verified:v6"
 
 "$PHP_BIN" -l "$HOME_DIR/admin.6ixmediasa.com/index.php" >/dev/null || fail "lint:index"
