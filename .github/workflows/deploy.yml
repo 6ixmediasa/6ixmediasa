@@ -1,6 +1,11 @@
 name: Deploy to cPanel
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/deploy-now.txt"
   workflow_dispatch:
     inputs:
       confirm_live_deploy:
@@ -17,7 +22,7 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    if: ${{ github.event.inputs.confirm_live_deploy == 'DEPLOY' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.confirm_live_deploy == 'DEPLOY' }}
     runs-on: ubuntu-latest
 
     steps:
