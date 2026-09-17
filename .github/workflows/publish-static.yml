@@ -40,7 +40,7 @@ jobs:
       - name: Build static site
         run: npm run build
 
-      - name: Verify output
+      - name: Verify output and create deployment marker
         shell: bash
         run: |
           set -euo pipefail
@@ -48,7 +48,8 @@ jobs:
           test -f out/logo.png
           test -f out/projects/exquisite-management/project.pdf
           test -f out/blog/index.html
-          printf '%s\n' "$GITHUB_SHA" > out/.deploy-sha
+          CONTENT_HASH="$(sha256sum lib/cms-content.json | awk '{print $1}')"
+          printf '%s-%s\n' "$GITHUB_SHA" "$CONTENT_HASH" > out/.deploy-sha
           touch out/.nojekyll
 
       - name: Publish production-static branch
@@ -57,12 +58,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          MARKER="$(cat out/.deploy-sha)"
           cd out
           git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Static production build ${GITHUB_SHA}"
+          git commit -m "Static production build ${MARKER}"
           git branch -M production-static
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin production-static
