@@ -1,0 +1,20 @@
+name: Live CMS status
+
+on:
+  push:
+    branches: [admin-cms]
+    paths:
+      - '.github/workflows/live-cms-status.yml'
+  workflow_dispatch:
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch live CMS status
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -L --connect-timeout 10 --max-time 20 -o status.json -w '%{http_code}' 'https://admin.6ixmediasa.com/api/status.php' || true)"
+          echo "HTTP $code"
+          cat status.json 2>/dev/null || true
+          echo
