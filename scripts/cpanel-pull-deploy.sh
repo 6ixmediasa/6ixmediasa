@@ -6,6 +6,7 @@ BRANCH="production-static"
 HOME_DIR="${HOME:-/home/ixmedia1}"
 DEPLOY_PATH="$HOME_DIR/public_html"
 BACKUP_DIR="$HOME_DIR/deploy-backups"
+BACKUP_KEEP=5
 MARKER_FILE="$HOME_DIR/.6ixmedia-last-deploy"
 LOCK_DIR="$HOME_DIR/.6ixmedia-deploy-lock"
 RAW_MARKER_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}/.deploy-sha"
@@ -69,5 +70,13 @@ test -f "$DEPLOY_PATH/index.html"
 test -f "$DEPLOY_PATH/logo.png"
 test -f "$DEPLOY_PATH/projects/exquisite-management/project.pdf"
 printf '%s\n' "$REMOTE_SHA" > "$MARKER_FILE"
+
+# Keep only the newest production backups so repeated deployments do not fill the hosting account.
+if [ -d "$BACKUP_DIR" ]; then
+  mapfile -t OLD_BACKUPS < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'public_html-before-nextjs-*.tar.gz' -printf '%T@ %p\n' | sort -nr | awk -v keep="$BACKUP_KEEP" 'NR > keep {sub(/^[^ ]+ /, ""); print}')
+  if [ "${#OLD_BACKUPS[@]}" -gt 0 ]; then
+    rm -f -- "${OLD_BACKUPS[@]}"
+  fi
+fi
 
 echo "6ixMedia SA deployment complete: $REMOTE_SHA"
