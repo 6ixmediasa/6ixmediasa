@@ -71,12 +71,15 @@ test -f "$DEPLOY_PATH/logo.png"
 test -f "$DEPLOY_PATH/projects/exquisite-management/project.pdf"
 printf '%s\n' "$REMOTE_SHA" > "$MARKER_FILE"
 
-# Keep only the newest production backups so repeated deployments do not fill the hosting account.
+# Keep only the newest production backups. Avoid bash process substitution here
+# because some cPanel shared-hosting shells do not expose /dev/fd entries.
 if [ -d "$BACKUP_DIR" ]; then
-  mapfile -t OLD_BACKUPS < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'public_html-before-nextjs-*.tar.gz' -printf '%T@ %p\n' | sort -nr | awk -v keep="$BACKUP_KEEP" 'NR > keep {sub(/^[^ ]+ /, ""); print}')
-  if [ "${#OLD_BACKUPS[@]}" -gt 0 ]; then
-    rm -f -- "${OLD_BACKUPS[@]}"
-  fi
+  find "$BACKUP_DIR" -maxdepth 1 -type f -name 'public_html-before-nextjs-*.tar.gz' -printf '%T@ %p\n' \
+    | sort -nr \
+    | awk -v keep="$BACKUP_KEEP" 'NR > keep {sub(/^[^ ]+ /, ""); print}' \
+    | while IFS= read -r old_backup; do
+        [ -n "$old_backup" ] && rm -f -- "$old_backup"
+      done
 fi
 
 echo "6ixMedia SA deployment complete: $REMOTE_SHA"
