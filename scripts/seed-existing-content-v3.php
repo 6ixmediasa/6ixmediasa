@@ -5,11 +5,12 @@ $home=getenv('HOME')?:'/home/ixmedia1';
 $configFile=$home.'/.6ixmedia-admin/config.php';
 if(!is_file($configFile)){fwrite(STDERR,"Admin config missing.\n");exit(1);} $c=require $configFile;
 $pdo=new PDO(sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4',$c['db_host'],$c['db_name']),$c['db_user'],$c['db_pass'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]);
-function remote(string $url): string { $ctx=stream_context_create(['http'=>['timeout'=>30,'user_agent'=>'6ixMedia-CMS-Seeder/3.0']]); $s=@file_get_contents($url,false,$ctx); if($s===false) throw new RuntimeException("Could not download $url"); return $s; }
+function remote(string $url): string { $ctx=stream_context_create(['http'=>['timeout'=>30,'user_agent'=>'6ixMedia-CMS-Seeder/3.1']]); $s=@file_get_contents($url,false,$ctx); if($s===false) throw new RuntimeException("Could not download $url"); return $s; }
+function projectSource(): string { $local=(string)(getenv('PROJECTS_TS_PATH')?:''); if($local!==''&&is_file($local)){ $s=file_get_contents($local); if($s!==false&&$s!=='') return $s; } return remote('https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/main/lib/projects.ts'); }
 function tsString(string $block,string $field): string { $p='/\\b'.preg_quote($field,'/').'\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"/s'; return preg_match($p,$block,$m)?stripcslashes($m[1]):''; }
 function tsArray(string $block,string $field): array { $p='/\\b'.preg_quote($field,'/').'\\s*:\\s*\\[([^\\]]*)\\]/s'; if(!preg_match($p,$block,$m))return[]; preg_match_all('/"((?:\\\\.|[^"\\\\])*)"/s',$m[1],$mm); return array_map('stripcslashes',$mm[1]??[]); }
 function docLabel(string $file): string { $stem=pathinfo($file,PATHINFO_FILENAME); if(strtolower($stem)==='project')return'Project presentation'; return ucfirst(str_replace(['-','_'],' ',$stem)); }
-$source=remote('https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/main/lib/projects.ts');
+$source=projectSource();
 $categoryMap=['web'=>'Web Design','shop'=>'E-Commerce','app'=>'Mobile App','webapp'=>'Web App','soft'=>'Software','logo'=>'Logo Design'];
 if(!preg_match_all('/\\{\\s*slug\\s*:\\s*"([^"]+)"\\s*,(.*?)^\\s*\\},?\\s*$/ms',$source,$matches,PREG_SET_ORDER)) throw new RuntimeException('Could not parse existing projects.');
 $up=$pdo->prepare("INSERT INTO projects (title,slug,category,tagline,about,services_json,tech_json,year,industry,cover_image,shots_json,docs_json,status,seo_title,seo_description,sort_order)
