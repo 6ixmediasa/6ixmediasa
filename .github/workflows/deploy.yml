@@ -65,6 +65,7 @@ jobs:
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -74,11 +75,24 @@ jobs:
           PY
           chmod 600 ~/.ssh/cpanel_deploy_key
 
-          if [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
+          if grep -q '^PuTTY-User-Key-File' ~/.ssh/cpanel_deploy_key; then
+            echo "Detected PuTTY private key; converting to OpenSSH."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq putty-tools >/dev/null
+            printf '%s' "${SSH_KEY_PASSPHRASE:-}" > /tmp/ssh-passphrase
+            chmod 600 /tmp/ssh-passphrase
+            puttygen ~/.ssh/cpanel_deploy_key -O private-openssh -o ~/.ssh/cpanel_deploy_key.converted --old-passphrase /tmp/ssh-passphrase
+            mv ~/.ssh/cpanel_deploy_key.converted ~/.ssh/cpanel_deploy_key
+            chmod 600 ~/.ssh/cpanel_deploy_key
+            rm -f /tmp/ssh-passphrase
+          elif [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
             if grep -q "BEGIN OPENSSH PRIVATE KEY" ~/.ssh/cpanel_deploy_key; then
               ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f ~/.ssh/cpanel_deploy_key >/dev/null
             else
               if openssl pkey -in ~/.ssh/cpanel_deploy_key -passin env:SSH_KEY_PASSPHRASE -out ~/.ssh/cpanel_deploy_key.tmp >/dev/null 2>&1; then
+                mv ~/.ssh/cpanel_deploy_key.tmp ~/.ssh/cpanel_deploy_key
+                chmod 600 ~/.ssh/cpanel_deploy_key
+              elif openssl rsa -in ~/.ssh/cpanel_deploy_key -passin env:SSH_KEY_PASSPHRASE -out ~/.ssh/cpanel_deploy_key.tmp >/dev/null 2>&1; then
                 mv ~/.ssh/cpanel_deploy_key.tmp ~/.ssh/cpanel_deploy_key
                 chmod 600 ~/.ssh/cpanel_deploy_key
               else
