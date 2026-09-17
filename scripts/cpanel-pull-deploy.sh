@@ -52,18 +52,27 @@ if [ -n "$(find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)
   echo "Backup created: $BACKUP"
 fi
 
-PRESERVE_DIR="$TMP_DIR/well-known-preserve"
+PRESERVE_DIR="$TMP_DIR/preserve"
+mkdir -p "$PRESERVE_DIR"
 if [ -d "$DEPLOY_PATH/.well-known" ]; then
-  mkdir -p "$PRESERVE_DIR"
-  cp -a "$DEPLOY_PATH/.well-known/." "$PRESERVE_DIR/"
+  mkdir -p "$PRESERVE_DIR/.well-known"
+  cp -a "$DEPLOY_PATH/.well-known/." "$PRESERVE_DIR/.well-known/"
+fi
+if [ -d "$DEPLOY_PATH/cms-uploads" ]; then
+  mkdir -p "$PRESERVE_DIR/cms-uploads"
+  cp -a "$DEPLOY_PATH/cms-uploads/." "$PRESERVE_DIR/cms-uploads/"
 fi
 
-find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name '.well-known' -exec rm -rf -- {} +
+find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 ! -name '.well-known' ! -name 'cms-uploads' -exec rm -rf -- {} +
 cp -a "$SRC_DIR/." "$DEPLOY_PATH/"
 
-if [ -d "$PRESERVE_DIR" ]; then
+if [ -d "$PRESERVE_DIR/.well-known" ]; then
   mkdir -p "$DEPLOY_PATH/.well-known"
-  cp -a "$PRESERVE_DIR/." "$DEPLOY_PATH/.well-known/"
+  cp -a "$PRESERVE_DIR/.well-known/." "$DEPLOY_PATH/.well-known/"
+fi
+if [ -d "$PRESERVE_DIR/cms-uploads" ]; then
+  mkdir -p "$DEPLOY_PATH/cms-uploads"
+  cp -a "$PRESERVE_DIR/cms-uploads/." "$DEPLOY_PATH/cms-uploads/"
 fi
 
 test -f "$DEPLOY_PATH/index.html"
@@ -71,8 +80,6 @@ test -f "$DEPLOY_PATH/logo.png"
 test -f "$DEPLOY_PATH/projects/exquisite-management/project.pdf"
 printf '%s\n' "$REMOTE_SHA" > "$MARKER_FILE"
 
-# Keep only the newest production backups. Avoid bash process substitution here
-# because some cPanel shared-hosting shells do not expose /dev/fd entries.
 if [ -d "$BACKUP_DIR" ]; then
   find "$BACKUP_DIR" -maxdepth 1 -type f -name 'public_html-before-nextjs-*.tar.gz' -printf '%T@ %p\n' \
     | sort -nr \
