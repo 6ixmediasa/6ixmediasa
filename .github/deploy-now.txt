@@ -1,2 +1,3 @@
 Deploy the verified static Next.js site to cPanel production.
 Retry after SSH key normalization fix.
+Retry with PuTTY/PEM compatibility.
