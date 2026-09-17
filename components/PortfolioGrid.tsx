@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Icon from "./Icon";
-import { projects, categories } from "@/lib/projects";
+import { projects, categories } from "@/lib/content";
 
 export default function PortfolioGrid() {
   const [cat, setCat] = useState("All");
