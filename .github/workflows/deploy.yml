@@ -58,16 +58,86 @@ jobs:
         shell: bash
         env:
           SSH_PRIVATE_KEY_B64: ${{ secrets.CPANEL_SSH_PRIVATE_KEY_B64 }}
+          SSH_PRIVATE_KEY_RAW: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.CPANEL_HOST }}
           SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          test -n "$SSH_PRIVATE_KEY_B64"
-          printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n\t ' | base64 --decode > ~/.ssh/cpanel_deploy_key
-          chmod 600 ~/.ssh/cpanel_deploy_key
-          ssh-keygen -y -f ~/.ssh/cpanel_deploy_key >/dev/null
+
+          python3 - <<'PY'
+          import base64
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          target = Path.home() / ".ssh/cpanel_deploy_key"
+          candidates = []
+
+          def extract_private_key(text):
+              if not text:
+                  return None
+              text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+              patterns = [
+                  r"-----BEGIN OPENSSH PRIVATE KEY-----.*?-----END OPENSSH PRIVATE KEY-----",
+                  r"-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                  r"-----BEGIN PRIVATE KEY-----.*?-----END PRIVATE KEY-----",
+              ]
+              for pattern in patterns:
+                  m = re.search(pattern, text, re.S)
+                  if m:
+                      return m.group(0).strip() + "\n"
+              return None
+
+          raw = os.environ.get("SSH_PRIVATE_KEY_RAW", "")
+          raw_key = extract_private_key(raw)
+          if raw_key:
+              candidates.append(raw_key)
+
+          secret = os.environ.get("SSH_PRIVATE_KEY_B64", "")
+          direct_key = extract_private_key(secret)
+          if direct_key:
+              candidates.append(direct_key)
+
+          if secret:
+              attempts = []
+              compact = re.sub(r"\s+", "", secret)
+              attempts.append(compact)
+              prefix = "LS0tLS1CRUdJTi"
+              pos = compact.find(prefix)
+              if pos > 0:
+                  attempts.append(compact[pos:])
+
+              for encoded in attempts:
+                  try:
+                      decoded = base64.b64decode(encoded, validate=False)
+                  except Exception:
+                      continue
+                  try:
+                      decoded_text = decoded.decode("utf-8", errors="ignore")
+                  except Exception:
+                      continue
+                  key = extract_private_key(decoded_text)
+                  if key:
+                      candidates.append(key)
+
+          seen = set()
+          for key in candidates:
+              if key in seen:
+                  continue
+              seen.add(key)
+              target.write_text(key)
+              target.chmod(0o600)
+              result = subprocess.run(["ssh-keygen", "-y", "-f", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              if result.returncode == 0:
+                  print("SSH private key parsed successfully.")
+                  break
+          else:
+              raise SystemExit("No valid unencrypted SSH private key could be parsed from the configured secrets.")
+          PY
+
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
