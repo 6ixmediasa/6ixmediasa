@@ -1,0 +1,1 @@
+Deploy the verified static Next.js site to cPanel production.
