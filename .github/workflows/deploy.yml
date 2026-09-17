@@ -65,11 +65,29 @@ jobs:
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/cpanel_deploy_key
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          key = os.environ.get("SSH_PRIVATE_KEY", "")
+          key = key.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+          Path.home().joinpath(".ssh/cpanel_deploy_key").write_text(key)
+          PY
           chmod 600 ~/.ssh/cpanel_deploy_key
+
           if [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
-            ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f ~/.ssh/cpanel_deploy_key >/dev/null
+            if grep -q "BEGIN OPENSSH PRIVATE KEY" ~/.ssh/cpanel_deploy_key; then
+              ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f ~/.ssh/cpanel_deploy_key >/dev/null
+            else
+              if openssl pkey -in ~/.ssh/cpanel_deploy_key -passin env:SSH_KEY_PASSPHRASE -out ~/.ssh/cpanel_deploy_key.tmp >/dev/null 2>&1; then
+                mv ~/.ssh/cpanel_deploy_key.tmp ~/.ssh/cpanel_deploy_key
+                chmod 600 ~/.ssh/cpanel_deploy_key
+              else
+                ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f ~/.ssh/cpanel_deploy_key >/dev/null
+              fi
+            fi
           fi
+
+          ssh-keygen -y -f ~/.ssh/cpanel_deploy_key >/dev/null
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
