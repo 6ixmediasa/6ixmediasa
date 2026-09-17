@@ -65,7 +65,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           test -n "$SSH_PRIVATE_KEY_B64"
-          printf '%s' "$SSH_PRIVATE_KEY_B64" | base64 --decode > ~/.ssh/cpanel_deploy_key
+          printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n\t ' | base64 --decode > ~/.ssh/cpanel_deploy_key
           chmod 600 ~/.ssh/cpanel_deploy_key
           ssh-keygen -y -f ~/.ssh/cpanel_deploy_key >/dev/null
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
