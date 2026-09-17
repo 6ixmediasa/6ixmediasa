@@ -2,8 +2,10 @@ import snapshot from './cms-content.json';
 import { projects as seedProjects, type Project } from './projects';
 
 const asArray = <T>(value: unknown, fallback: T[] = []): T[] => Array.isArray(value) ? value as T[] : fallback;
+export type CmsDoc = { label: string; file: string; note?: string };
+export type CmsProject = Project & { docs?: CmsDoc[]; seoTitle?: string; seoDescription?: string };
 
-export const projects: Project[] = snapshot.projects.length ? snapshot.projects.map((p: any) => ({
+export const projects: CmsProject[] = snapshot.projects.length ? snapshot.projects.map((p: any) => ({
   slug: p.slug,
   name: p.title,
   category: p.category || 'Web Design',
@@ -24,7 +26,6 @@ export const categories = Array.from(new Set(projects.map((p) => p.category)));
 export function getProject(slug: string) { return projects.find((p) => p.slug === slug); }
 export function relatedProjects(p: Project, n = 3) { return projects.filter((x) => x.category === p.category && x.slug !== p.slug).slice(0,n); }
 
-export type CmsDoc = { label: string; file: string; note?: string };
 export type PlatformContent = {
   slug: string; name: string; what: string; h1: string; lead: string;
   metaTitle: string; metaDescription: string; price?: string; priceNote?: string;
