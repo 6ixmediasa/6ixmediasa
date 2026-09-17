@@ -1,0 +1,56 @@
+name: Build check
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify restored public assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/logo.png
+          test -f public/hero.webp
+          test -f public/projects/exquisite-management/project.pdf
+          test -f public/docs/6ix-Media-SA-Complete-Portfolio.pdf
+          project_files=$(find public/projects -type f | wc -l)
+          docs_files=$(find public/docs -type f | wc -l)
+          echo "Project files: $project_files"
+          echo "Docs files: $docs_files"
+          test "$project_files" -eq 62
+          test "$docs_files" -eq 13
+          echo "6395fc1bf59e3e4353b89ece6d87f6429612a42df78921b2a60ae62f9c0e047f  public/projects/exquisite-management/project.pdf" | sha256sum -c -
+          echo "474def1246e8d35d50491467ebd0132b13f6950d9bb2aa3dd93af9e0c1ecf159  public/docs/6ix-Media-SA-Complete-Portfolio.pdf" | sha256sum -c -
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Verify export output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d out
+          test -f out/index.html
+          test -f out/logo.png
+          test -f out/projects/exquisite-management/project.pdf
+          echo "Static export generated successfully."
