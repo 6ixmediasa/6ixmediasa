@@ -25,4 +25,4 @@ jobs:
           set -euo pipefail
           HOST="zacp105.webway.host"
           USER="chatgpt@6ixmediasa.com"
-          lftp -u "$USER","$FTP_PASSWORD" -p 21 "$HOST" -e "set cmd:fail-exit yes; set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate yes; echo PWD_START; pwd; echo LIST_START; cls -la; echo WRITE_TEST; mkdir .chatgpt-deploy-probe; rmdir .chatgpt-deploy-probe; echo PROBE_OK; bye"
+          lftp -u "$USER","$FTP_PASSWORD" -p 21 "$HOST" -e "set cmd:fail-exit yes; set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate yes; echo ROOT_LIST; cls -la; echo CHATGPT_LIST; cls -la chatgpt; echo WRITE_TEST; mkdir .chatgpt-deploy-probe; rmdir .chatgpt-deploy-probe; echo PROBE_OK; bye"
