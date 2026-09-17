@@ -43,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Production dependency audit
-        run: npm audit --omit=dev || true
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build static export
         run: npm run build
