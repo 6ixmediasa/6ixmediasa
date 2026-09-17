@@ -11,10 +11,10 @@ MARKER_FILE="$HOME_DIR/.6ixmedia-last-deploy"
 LOCK_DIR="$HOME_DIR/.6ixmedia-deploy-lock"
 RAW_MARKER_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}/.deploy-sha"
 ARCHIVE_URL="https://codeload.github.com/${REPO}/tar.gz/refs/heads/${BRANCH}"
-ADMIN_VERSION="3"
+ADMIN_VERSION="4"
 ADMIN_VERSION_FILE="$HOME_DIR/.6ixmedia-admin-version"
 ADMIN_CONFIG="$HOME_DIR/.6ixmedia-admin/config.php"
-ADMIN_UPGRADE_URL="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/admin-cms/scripts/upgrade-admin-v3.sh"
+ADMIN_UPGRADE_URL="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/admin-cms/scripts/upgrade-admin-v4.sh"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "Another 6ixMedia deployment is already running; exiting."
@@ -26,9 +26,6 @@ trap cleanup_lock EXIT
 command -v curl >/dev/null 2>&1 || { echo "curl is required." >&2; exit 1; }
 command -v tar >/dev/null 2>&1 || { echo "tar is required." >&2; exit 1; }
 
-# The same cron that deploys the public site also keeps the custom admin CMS current.
-# This avoids storing hosting credentials in GitHub and means admin changes can roll out
-# without another manual cPanel step once the CMS has been installed once.
 if [ -f "$ADMIN_CONFIG" ]; then
   CURRENT_ADMIN_VERSION=""
   [ -f "$ADMIN_VERSION_FILE" ] && CURRENT_ADMIN_VERSION="$(tr -d '\r\n' < "$ADMIN_VERSION_FILE")"
