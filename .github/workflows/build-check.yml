@@ -42,6 +42,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Production dependency audit
+        run: npm audit --omit=dev || true
+
       - name: Build static export
         run: npm run build
 
