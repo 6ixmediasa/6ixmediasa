@@ -11,10 +11,10 @@ MARKER_FILE="$HOME_DIR/.6ixmedia-last-deploy"
 LOCK_DIR="$HOME_DIR/.6ixmedia-deploy-lock"
 RAW_MARKER_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}/.deploy-sha"
 ARCHIVE_URL="https://codeload.github.com/${REPO}/tar.gz/refs/heads/${BRANCH}"
-ADMIN_VERSION="4"
+ADMIN_VERSION="5"
 ADMIN_VERSION_FILE="$HOME_DIR/.6ixmedia-admin-version"
 ADMIN_CONFIG="$HOME_DIR/.6ixmedia-admin/config.php"
-ADMIN_UPGRADE_URL="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/admin-cms/scripts/upgrade-admin-v4.sh"
+ADMIN_UPGRADE_URL="https://raw.githubusercontent.com/6ixmediasa/6ixmediasa/admin-cms/scripts/upgrade-admin-v5.sh"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "Another 6ixMedia deployment is already running; exiting."
