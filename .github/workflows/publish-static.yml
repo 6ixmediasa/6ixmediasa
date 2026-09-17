@@ -5,6 +5,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
@@ -32,6 +34,9 @@ jobs:
       - name: Security audit
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Fetch published CMS content
+        run: node scripts/fetch-cms-content.mjs
+
       - name: Build static site
         run: npm run build
 
@@ -42,6 +47,7 @@ jobs:
           test -f out/index.html
           test -f out/logo.png
           test -f out/projects/exquisite-management/project.pdf
+          test -f out/blog/index.html
           printf '%s\n' "$GITHUB_SHA" > out/.deploy-sha
           touch out/.nojekyll
 
