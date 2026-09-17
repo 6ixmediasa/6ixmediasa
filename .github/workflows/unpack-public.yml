@@ -1,0 +1,53 @@
+name: Restore public assets from uploaded ZIPs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs.zip"
+      - "projects.zip"
+      - "public-root.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore-public:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract any uploaded public asset ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          for z in docs.zip projects.zip public-root.zip; do
+            if [ -f "$z" ]; then
+              echo "Extracting $z"
+              unzip -o "$z" -d .
+              rm -f "$z"
+              found=1
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No asset ZIPs found."
+          fi
+
+      - name: Commit restored public assets
+        shell: bash
+        run: |
+          git config user.name "6ixMedia SA Automation"
+          git config user.email "91912065+6ixmediasa@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No public asset changes to commit."
+          else
+            git commit -m "Restore public website assets"
+            git push origin HEAD:main
+          fi
