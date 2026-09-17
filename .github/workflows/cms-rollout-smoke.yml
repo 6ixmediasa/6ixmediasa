@@ -1,0 +1,52 @@
+name: CMS rollout smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cms-rollout-smoke.yml'
+      - 'scripts/cpanel-pull-deploy.sh'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  verify-cms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for cPanel CMS rollout
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS_URL='https://admin.6ixmediasa.com/api/status.php'
+          CONTENT_URL='https://admin.6ixmediasa.com/api/published.php'
+          for attempt in $(seq 1 20); do
+            echo "CMS status attempt $attempt/20"
+            code="$(curl -sS -L --connect-timeout 10 --max-time 20 -o status.json -w '%{http_code}' "$STATUS_URL" || true)"
+            echo "HTTP $code"
+            cat status.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ] && php -r '$j=json_decode(file_get_contents("status.json"),true); exit(($j["ok"]??false) && ($j["counts"]["projects"]??0)>=30 && ($j["counts"]["platforms"]??0)>=8 ? 0 : 1);'; then
+              curl -fsSL --connect-timeout 10 --max-time 30 "$CONTENT_URL" -o content.json
+              php -r '$j=json_decode(file_get_contents("content.json"),true); if(!is_array($j)||count($j["projects"]??[])<30||count($j["platforms"]??[])<8){fwrite(STDERR,"Published content payload incomplete\n");exit(1);} printf("Published CMS payload verified: %d projects, %d platforms, %d posts\n",count($j["projects"]),count($j["platforms"]),count($j["posts"]??[]));'
+              exit 0
+            fi
+            sleep 20
+          done
+          echo 'CMS rollout did not become healthy within the verification window.' >&2
+          exit 1
+
+      - name: Trigger final CMS-backed production build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/publish-static.yml/dispatches" \
+            -d '{"ref":"main"}'
+          echo 'Final production build dispatched.'
