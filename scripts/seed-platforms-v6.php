@@ -1,0 +1,57 @@
+<?php
+declare(strict_types=1);
+if (PHP_SAPI !== 'cli') { fwrite(STDERR,"CLI only.\n"); exit(1); }
+$home=getenv('HOME')?:'/home/ixmedia1';
+$configFile=$home.'/.6ixmedia-admin/config.php';
+if(!is_file($configFile)){fwrite(STDERR,"Admin config missing.\n");exit(1);} $c=require $configFile;
+$pdo=new PDO(sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4',$c['db_host'],$c['db_name']),$c['db_user'],$c['db_pass'],[
+ PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,
+ PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,
+ PDO::ATTR_EMULATE_PREPARES=>false
+]);
+
+$platforms=[
+['vendra','Vendra','Multi-vendor ecommerce','Vendra — multi-vendor marketplace platform','Let other businesses sell on your platform while you take a commission on every order.','Multi-Vendor Marketplace Software South Africa | Vendra','Launch a multi-vendor ecommerce marketplace in South Africa. Vendor storefronts, commission rules, automated payouts and mobile apps, branded as your own.',['Vendor registration, verification and storefronts','Commission by category, vendor or product','Automated payouts and vendor statements','Product approval workflow','Ratings and reviews on both sides','Customer apps for iOS and Android'],'Anyone aggregating independent sellers — craft, electronics, agriculture, spares.'],
+['freshlane','Freshlane','Online grocery marketplace','Freshlane — online grocery marketplace platform','Multi-store grocery ordering with delivery slots, substitutions and picker workflows.','Online Grocery Marketplace Software South Africa | Freshlane','Launch an online grocery delivery marketplace. Multiple stores, delivery slots, substitutions, weight-based pricing and driver dispatch, under your brand.',['Multiple stores with separate catalogues','Delivery slot booking','Weight and unit based pricing','Substitution rules for out-of-stock items','Picker and packer mobile workflow','Driver dispatch and tracking'],'Grocers, butcheries, produce suppliers and township delivery services.'],
+['tablo','Tablo','Restaurant ordering and delivery','Tablo — restaurant ordering and delivery platform','Multi-restaurant food ordering with kitchen displays, driver dispatch and live tracking.','Food Delivery App Software South Africa | Tablo','Launch a multi-restaurant food ordering and delivery platform. Menus, kitchen display, driver app, live tracking and commission handling, under your brand.',['Restaurant onboarding and menu management','Modifiers, combos and add-ons','Kitchen display and order acceptance','Driver app with live tracking','Delivery fees by distance','Scheduled and pre-orders'],'Food delivery startups, restaurant groups and township delivery networks.'],
+['chalkline','Chalkline','Tutoring marketplace','Chalkline — online tutoring marketplace platform','Connect tutors and students, with scheduling, video lessons and payments in one place.','Online Tutoring Marketplace Software | Chalkline','Launch an online tutoring marketplace. Tutor profiles, subject search, lesson scheduling, video classes, payments and reviews, branded as your own.',['Tutor profiles, subjects and rates','Availability calendar and booking','Built-in or integrated video lessons','Lesson packages and credits','Automated tutor payouts','Reviews and progress notes'],'Tutoring agencies, training providers and education startups.'],
+['lendo','Lendo','Rental marketplace','Lendo — rental marketplace platform','Rent out anything by the hour, day or week, with deposits and availability handled automatically.','Rental Marketplace Software South Africa | Lendo','Launch a rental marketplace for equipment, vehicles, venues or tools. Availability calendars, deposits, damage claims and owner payouts, under your brand.',['Availability calendars per item','Hourly, daily and weekly rates','Security deposits and holds','Damage reporting and claims','Collection and delivery options','Owner payouts and statements'],'Equipment hire, party and event supplies, vehicles, venues and tools.'],
+['callout','Callout','On-demand services','Callout — on-demand services marketplace platform','Match customers with plumbers, cleaners, electricians and trades, with quotes and job tracking.','On-Demand Services Marketplace Software | Callout','Launch an on-demand services marketplace for trades and home services. Job posting, quotes, provider vetting, scheduling and payments under your brand.',['Job posting and quote requests','Provider vetting and documents','Service areas and travel radius','Scheduling and job status tracking','In-app messaging','Payment release on completion'],'Home services, trades directories and facilities management businesses.'],
+['waypoint','Waypoint','Ride hailing and taxi','Waypoint — ride hailing and taxi platform','A turnkey ride hailing system with driver and rider apps, fare rules and live dispatch.','Taxi & Ride Hailing App Software South Africa | Waypoint','Launch a ride hailing or taxi service. Rider and driver apps, live dispatch, fare calculation, trip tracking and driver payouts, branded as your own.',['Rider and driver mobile apps','Live dispatch and matching','Distance and time based fares','Trip tracking and share-my-ride','Driver earnings and payouts','Cash and card fare handling'],'Taxi associations, shuttle operators and regional ride hailing startups.'],
+['dispatch','Dispatch','Delivery and logistics','Dispatch — delivery and logistics platform','Manage a delivery fleet with route assignment, proof of delivery and live customer tracking.','Delivery & Logistics App Software South Africa | Dispatch','Launch a delivery and courier platform. Order intake, route assignment, driver app, proof of delivery and live tracking, branded as your own.',['Order intake and bulk import','Route assignment and optimisation','Driver app with navigation','Proof of delivery with photo and signature','Live customer tracking links','Fleet and performance reporting'],'Courier companies, last-mile delivery services and distribution businesses.'],
+];
+$deliver=['Platform configured to your rules','Your branding applied throughout','Payment gateway connected','Admin training and documentation','Launch support','Optional mobile apps'];
+$sql="INSERT INTO `platforms` (`slug`,`name`,`what_label`,`h1`,`lead`,`meta_title`,`meta_description`,`price`,`price_note`,`features_json`,`audience`,`deliverables_json`,`faqs_json`,`docs_json`,`status`,`sort_order`)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'published',?)
+ON DUPLICATE KEY UPDATE
+ `name`=IF(`name`='',VALUES(`name`)),
+ `what_label`=IF(COALESCE(`what_label`,'')='',VALUES(`what_label`)),
+ `h1`=IF(`h1`='',VALUES(`h1`)),
+ `lead`=IF(COALESCE(`lead`,'')='',VALUES(`lead`)),
+ `meta_title`=IF(COALESCE(`meta_title`,'')='',VALUES(`meta_title`)),
+ `meta_description`=IF(COALESCE(`meta_description`,'')='',VALUES(`meta_description`)),
+ `price`=IF(COALESCE(`price`,'')='',VALUES(`price`)),
+ `price_note`=IF(COALESCE(`price_note`,'')='',VALUES(`price_note`)),
+ `features_json`=IF(COALESCE(`features_json`,'')='',VALUES(`features_json`)),
+ `audience`=IF(COALESCE(`audience`,'')='',VALUES(`audience`)),
+ `deliverables_json`=IF(COALESCE(`deliverables_json`,'')='',VALUES(`deliverables_json`)),
+ `faqs_json`=IF(COALESCE(`faqs_json`,'')='',VALUES(`faqs_json`)),
+ `docs_json`=IF(COALESCE(`docs_json`,'')='',VALUES(`docs_json`)),
+ `status`='published',
+ `sort_order`=VALUES(`sort_order`)";
+$pup=$pdo->prepare($sql);
+$j=0;
+foreach($platforms as $p){
+ [$slug,$name,$what,$h1,$lead,$mt,$md,$features,$audience]=$p;
+ $docFile='/docs/'.$slug.'-technical-specifications.pdf';
+ $docs=is_file($home.'/public_html'.$docFile)?[['label'=>'Technical specifications','file'=>$docFile,'note'=>'Full platform specification']]:[];
+ $faqs=[
+  ['q'=>'Can I change the name?','a'=>"Yes — $name is our internal working title. You trade under whatever name you choose, on your own domain."],
+  ['q'=>'How long until launch?','a'=>'Four to eight weeks typically, depending on how much customisation you want and how quickly your content, terms and payment accounts are ready.'],
+  ['q'=>'Can it be customised later?','a'=>'Yes. Most clients launch with the standard configuration, learn what their users need, then commission specific changes once there is evidence for them.']
+ ];
+ $pup->execute([$slug,$name,$what,$h1,$lead,$mt,$md,'From R18,000','Configured, branded and launched under your name.',json_encode($features,JSON_UNESCAPED_UNICODE),$audience,json_encode($deliver,JSON_UNESCAPED_UNICODE),json_encode($faqs,JSON_UNESCAPED_UNICODE),json_encode($docs,JSON_UNESCAPED_UNICODE),$j++]);
+}
+$count=(int)$pdo->query('SELECT COUNT(*) FROM `platforms`')->fetchColumn();
+if($count<8){fwrite(STDERR,"Expected at least 8 platforms after seed, found $count.\n");exit(1);}
+echo "Platform seed complete: $count platforms.\n";
