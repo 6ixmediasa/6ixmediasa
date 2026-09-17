@@ -14,8 +14,9 @@ jobs:
         run: |
           php -l public/index.php
           php -l public/api/published.php
+          php -l public/api/status.php
           php -l scripts/migrate-content-v4.php
           php -l scripts/seed-existing-content-v3.php
           php -l scripts/verify-cms-v4.php
-          bash -n scripts/upgrade-admin-v4.sh
+          bash -n scripts/upgrade-admin-v5.sh
           bash -n scripts/deploy-admin.sh
