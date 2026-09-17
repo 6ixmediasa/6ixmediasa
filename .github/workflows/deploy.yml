@@ -64,7 +64,7 @@ jobs:
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Verify SSH and rsync
+      - name: Verify SSH and deployment tools
         shell: bash
         env:
           SSH_HOST: ${{ secrets.CPANEL_HOST }}
@@ -74,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "set -e; command -v rsync >/dev/null; mkdir -p '$DEPLOY_PATH'; test -d '$DEPLOY_PATH'; echo 'SSH and rsync verified.'"
+            "set -e; command -v tar >/dev/null; command -v find >/dev/null; command -v cp >/dev/null; mkdir -p '$DEPLOY_PATH'; test -d '$DEPLOY_PATH'; echo 'SSH and deployment tools verified.'"
 
       - name: Back up current live files
         shell: bash
@@ -88,28 +88,38 @@ jobs:
           ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
             "set -e; mkdir -p \"$HOME/deploy-backups\"; if [ -n \"\$(find '$DEPLOY_PATH' -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)\" ]; then stamp=\$(date +%Y%m%d-%H%M%S); tar -czf \"$HOME/deploy-backups/public_html-before-nextjs-$stamp.tar.gz\" -C '$DEPLOY_PATH' .; echo \"Backup created: $HOME/deploy-backups/public_html-before-nextjs-$stamp.tar.gz\"; else echo 'Deploy path is empty; no backup needed.'; fi"
 
-      - name: Deploy static website
+      - name: Upload and stage static website
         shell: bash
         env:
           SSH_HOST: ${{ secrets.CPANEL_HOST }}
           SSH_USER: ${{ secrets.CPANEL_USER }}
           SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
-          DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          rsync -az --delete \
-            --exclude='.well-known/' \
-            -e "ssh -i ~/.ssh/cpanel_deploy_key -p $SSH_PORT" \
-            out/ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/"
+          STAGE_DIR="$HOME/.6ixmedia-deploy-$RUN_ID"
+          ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "rm -rf '$STAGE_DIR' && mkdir -p '$STAGE_DIR'"
+          tar -C out -czf - . | ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "tar -xzf - -C '$STAGE_DIR'"
+          ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "test -f '$STAGE_DIR/index.html' && test -f '$STAGE_DIR/logo.png' && echo 'Staged site verified.'"
 
-      - name: Verify deployed homepage
+      - name: Publish staged website
         shell: bash
         env:
           SSH_HOST: ${{ secrets.CPANEL_HOST }}
           SSH_USER: ${{ secrets.CPANEL_USER }}
           SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
           DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
+          STAGE_DIR="$HOME/.6ixmedia-deploy-$RUN_ID"
           ssh -i ~/.ssh/cpanel_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "test -f '$DEPLOY_PATH/index.html' && test -f '$DEPLOY_PATH/logo.png' && echo 'Deployment files verified on cPanel.'"
+            "set -e; \
+             test -f '$STAGE_DIR/index.html'; \
+             mkdir -p '$DEPLOY_PATH'; \
+             find '$DEPLOY_PATH' -mindepth 1 -maxdepth 1 ! -name '.well-known' -exec rm -rf -- {} +; \
+             cp -a '$STAGE_DIR'/.' '$DEPLOY_PATH'/; \
+             rm -rf '$STAGE_DIR'; \
+             test -f '$DEPLOY_PATH/index.html'; \
+             test -f '$DEPLOY_PATH/logo.png'; \
+             echo 'Deployment files verified on cPanel.'"
