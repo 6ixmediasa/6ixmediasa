@@ -1,0 +1,5 @@
+User-Agent: *
+Allow: /
+
+Host: https://6ixmediasa.com
+Sitemap: https://6ixmediasa.com/sitemap.xml
